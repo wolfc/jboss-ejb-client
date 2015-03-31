@@ -91,6 +91,8 @@ public class DummyServer {
     private final String host;
     private final String endpointName;
 
+    private int messageCount = 0;
+
     private AcceptingChannel<? extends ConnectedStreamChannel> server;
     private Map<EJBModuleIdentifier, Map<String, Object>> registeredEJBs = new ConcurrentHashMap<EJBModuleIdentifier, Map<String, Object>>();
 
@@ -170,6 +172,9 @@ public class DummyServer {
         return this.CLUSTER_NAME;
     }
 
+    public int getMessageCount() {
+        return messageCount;
+    }
 
     class LatestVersionProtocolHandler implements Channel.Receiver {
 
@@ -202,6 +207,7 @@ public class DummyServer {
             try {
                 final int header = inputStream.read();
                 logger.info("Received message with header 0x" + Integer.toHexString(header));
+                messageCount++;
                 switch (header) {
                     case 0x03:
                         final MethodInvocationRequest methodInvocationRequest = this.dummyProtocolHandler.readMethodInvocationRequest(inputStream, this.getClass().getClassLoader());

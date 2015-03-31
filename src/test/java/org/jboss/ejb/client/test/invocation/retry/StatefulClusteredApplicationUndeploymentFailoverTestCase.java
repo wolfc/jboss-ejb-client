@@ -52,6 +52,8 @@ import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 import static org.jboss.ejb.client.remoting.IoFutureHelper.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * Tests that invocation on stateful beans which are deployed in a cluster context, fails over without throwing any
@@ -297,12 +299,17 @@ public class StatefulClusteredApplicationUndeploymentFailoverTestCase {
             this.serverOne.unregister(APP_NAME, MODULE_NAME, DISTINCT_NAME, EchoBean.class.getSimpleName(), false);
         }
 
-        // do a few more invocations
-        for (int i = 0; i < 5; i++) {
-            final String echo = proxy.echo(msg);
-            Assert.assertEquals("Unexpected echo after undeployment", msg, echo);
-            final String serverName = proxy.getServerName();
-            Assert.assertEquals("Unexpected server name after undeployment", serverNameBeforeUndeployment, serverName);
+        try {
+            // do a few more invocations
+            for (int i = 0; i < 5; i++) {
+                final String echo = proxy.echo(msg);
+                Assert.assertEquals("Unexpected echo after undeployment", msg, echo);
+                final String serverName = proxy.getServerName();
+                Assert.assertEquals("Unexpected server name after undeployment", serverNameBeforeUndeployment, serverName);
+            }
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+            fail("EJBCLIENT-132: " + e.getMessage());
         }
 
         // now let the server send a undeploy notification to the client so that it actually knows that the deployment
@@ -321,6 +328,65 @@ public class StatefulClusteredApplicationUndeploymentFailoverTestCase {
             Assert.assertEquals("Unexpected server name after undeployment", serverNameBeforeUndeployment, serverName);
         }
 
+    }
+
+    /**
+     * If the first proxy errors, then the second proxy must choose the correct path.
+     * @throws Exception
+     */
+    @Test
+    public void testStatefulInvocationFailoverDueToUndeploymentDualProxy() throws Exception {
+        // first try some invocations which should succeed
+        // create a proxy for invocation
+        final StatefulEJBLocator<Echo> statefulEJBLocator = EJBClient.createSession(Echo.class, APP_NAME, MODULE_NAME, EchoBean.class.getSimpleName(), DISTINCT_NAME);
+        final Echo proxy1 = EJBClient.createProxy(statefulEJBLocator);
+        Assert.assertNotNull("Received a null proxy1", proxy1);
+
+        // ensure both proxies have the same weak affinity
+        Echo newProxy;
+        do {
+            newProxy = EJBClient.createProxy(EJBClient.createSession(Echo.class, APP_NAME, MODULE_NAME, EchoBean.class.getSimpleName(), DISTINCT_NAME));
+        } while (!newProxy.getServerName().equals(proxy1.getServerName()));
+        final Echo proxy2 = newProxy;
+
+        // invoke
+        final String msg = "foo!";
+        for (int i = 0; i < 5; i++) {
+            final String expected = msg + System.currentTimeMillis();
+            final String echo = proxy1.echo(expected);
+            Assert.assertEquals("Unexpected echo", expected, echo);
+            final String echo2 = proxy2.echo(expected);
+            Assert.assertEquals("Unexpected echo", expected, echo2);
+        }
+
+        final String serverNameBeforeUndeployment = proxy1.getServerName();
+        Assert.assertNotNull("Server name returned was null", serverNameBeforeUndeployment);
+        Assert.assertTrue("Unexpected server name returned", SERVER_ONE_NAME.equals(serverNameBeforeUndeployment) || SERVER_TWO_NAME.equals(serverNameBeforeUndeployment));
+
+        final DummyServer undeployedServer;
+        // now undeploy the deployment from the server on which this previous invocation happened.
+        // Note that we don't intentionally send a undeploy notification to the client and let it think that
+        // the server still has the deployment
+        final String expectedServerNameAfterUndeployment;
+        if (SERVER_ONE_NAME.equals(serverNameBeforeUndeployment)) {
+            undeployedServer = serverOne;
+            this.serverOne.unregister(APP_NAME, MODULE_NAME, DISTINCT_NAME, EchoBean.class.getSimpleName(), false);
+            expectedServerNameAfterUndeployment = SERVER_TWO_NAME;
+        } else {
+            undeployedServer = serverTwo;
+            this.serverTwo.unregister(APP_NAME, MODULE_NAME, DISTINCT_NAME, EchoBean.class.getSimpleName(), false);
+            expectedServerNameAfterUndeployment = SERVER_ONE_NAME;
+        }
+
+        // now invoke
+        final String serverNameAfterUndeployment = proxy1.getServerName();
+        Assert.assertNotNull("Server name was null after undeployment", serverNameAfterUndeployment);
+        Assert.assertFalse("Server on which deployment was undeployed was chosen", serverNameAfterUndeployment.equals(serverNameBeforeUndeployment));
+        Assert.assertEquals("Unexpected server name after undeployment", expectedServerNameAfterUndeployment, serverNameAfterUndeployment);
+
+        final int messageCount = undeployedServer.getMessageCount();
+        assertEquals("Unexpected server name after undeployment", expectedServerNameAfterUndeployment, proxy2.getServerName());
+        assertEquals("Should not have hit the undeployed server", messageCount, undeployedServer.getMessageCount());
     }
 
     private EJBReceiver getServerOneReceiver() throws IOException, URISyntaxException {
