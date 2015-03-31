@@ -33,6 +33,16 @@ public final class ReceiverInterceptor implements EJBClientInterceptor {
 
     private static final Logger logger = Logger.getLogger(ReceiverInterceptor.class);
 
+    /**
+     * Yet another hack to bypass going to a broken node.
+     * @param receiver
+     * @param locator
+     * @return
+     */
+    private static boolean acceptsModule(final EJBReceiver receiver, final EJBLocator<?> locator) {
+        return receiver.acceptsModule(locator.getAppName(), locator.getModuleName(), locator.getDistinctName());
+    }
+
     public void handleInvocation(final EJBClientInvocationContext invocationContext) throws Exception {
         final EJBClientContext clientContext = invocationContext.getClientContext();
         final EJBLocator<?> locator = invocationContext.getLocator();
@@ -78,7 +88,7 @@ public final class ReceiverInterceptor implements EJBClientInterceptor {
                     } else {
                         nodeReceiver = clientContext.getNodeEJBReceiver(nodeName);
                     }
-                    if (nodeReceiver != null && clientContext.clusterContains(((ClusterAffinity) affinity).getClusterName(), nodeReceiver.getNodeName())) {
+                    if (nodeReceiver != null && clientContext.clusterContains(((ClusterAffinity) affinity).getClusterName(), nodeReceiver.getNodeName()) && acceptsModule(nodeReceiver, locator)) {
                         receiverContext = clientContext.requireEJBReceiverContext(nodeReceiver);
                     } else {
                         receiverContext = clientContext.requireClusterEJBReceiverContext(invocationContext, ((ClusterAffinity) affinity).getClusterName());

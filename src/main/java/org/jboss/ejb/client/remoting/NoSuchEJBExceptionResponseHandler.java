@@ -22,6 +22,7 @@
 
 package org.jboss.ejb.client.remoting;
 
+import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.logging.Logger;
 
@@ -74,6 +75,9 @@ class NoSuchEJBExceptionResponseHandler extends ProtocolMessageHandler {
         }
         // retry the invocation on a different node
         try {
+            // Fairly wicked hack to invalidate the module accessibility on the EJB receiver.
+            final EJBLocator<?> locator = receiverInvocationContext.getClientInvocationContext().getLocator();
+            channelAssociation.getEjbReceiverContext().getReceiver().invalidateModule(locator.getAppName(), locator.getModuleName(), locator.getDistinctName());
             logger.info("Retrying invocation which failed on node " + receiverInvocationContext.getNodeName() + " with exception:", noSuchEJBException);
             receiverInvocationContext.retryInvocation(true);
         } catch (Exception e) {

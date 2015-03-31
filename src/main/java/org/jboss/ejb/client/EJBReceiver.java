@@ -48,6 +48,17 @@ public abstract class EJBReceiver extends Attachable {
     }
 
     /**
+     * Invalidate the accessibility of a module. (Protocol message 0x0A)
+     * @param appName
+     * @param moduleName
+     * @param distinctName
+     */
+    @Deprecated
+    public final void invalidateModule(final String appName, final String moduleName, final String distinctName) {
+        deregisterModule(appName, moduleName, distinctName);
+    }
+
+    /**
      * Register a new module to this receiver.
      *
      * @param appName      the app name
