@@ -736,7 +736,7 @@ public class PropertiesBasedEJBClientConfiguration implements EJBClientConfigura
         }
     }
 
-    private class RemotingConnectionConfigurationImpl implements RemotingConnectionConfiguration {
+    private class RemotingConnectionConfigurationImpl implements RemotingConnectionConfigurationV2 {
         final String host;
         final int port;
         final OptionMap connectionCreationOptions;
@@ -872,12 +872,6 @@ public class PropertiesBasedEJBClientConfiguration implements EJBClientConfigura
         public OptionMap getChannelCreationOptions() {
             return this.channelCreationOptions;
         }
-
-        @Override
-        public boolean isConnectEagerly() {
-            // connecting to cluster nodes is always on-demand and not eager. So return false.
-            return false;
-        }
     }
 
     private class ClusterNodeConfigurationImpl implements ClusterNodeConfiguration {
@@ -920,12 +914,6 @@ public class PropertiesBasedEJBClientConfiguration implements EJBClientConfigura
         @Override
         public OptionMap getChannelCreationOptions() {
             return this.channelCreationOptions;
-        }
-
-        @Override
-        public boolean isConnectEagerly() {
-            // connecting to cluster node is always on-demand and not eager. So return false.
-            return false;
         }
     }
 }

@@ -127,6 +127,10 @@ public class ConfigBasedEJBClientContextSelector implements IdentityEJBClientCon
         return this.ejbClientContext;
     }
 
+    public static boolean isConnectEagerly(EJBClientConfiguration.RemotingConnectionConfiguration configuration) {
+        return configuration instanceof EJBClientConfiguration.RemotingConnectionConfigurationV2 ? ((EJBClientConfiguration.RemotingConnectionConfigurationV2) configuration).isConnectEagerly() : true;
+    }
+
     private void setupEJBReceivers() throws IOException {
         if (!this.ejbClientConfiguration.getConnectionConfigurations().hasNext()) {
             // no connections configured so no EJB receivers to create
@@ -147,7 +151,7 @@ public class ConfigBasedEJBClientContextSelector implements IdentityEJBClientCon
             final ReconnectHandler reconnectHandler = new EJBClientContextConnectionReconnectHandler(ejbClientContext, endpoint, host, port, connectionConfiguration, MAX_RECONNECT_ATTEMPTS);
             // if the connection attempt shouldn't be "eager" then we just register the reconnect handler to the client context so that the reconnect handler
             // can attempt the connection whenever it's required to do so.
-            if (!connectionConfiguration.isConnectEagerly()) {
+            if (!isConnectEagerly(connectionConfiguration)) {
                 registerReconnectHandler(reconnectHandler, host, port);
                 logger.debug("Connection to host: " + host + " and port: " + port + ", in EJB client context: " + this.ejbClientContext + ", is configured to be attempted lazily. Skipping connection creation for now");
 
