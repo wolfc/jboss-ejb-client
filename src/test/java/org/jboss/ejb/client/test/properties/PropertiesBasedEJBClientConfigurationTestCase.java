@@ -22,6 +22,8 @@
 
 package org.jboss.ejb.client.test.properties;
 
+import static org.jboss.ejb.client.remoting.ConfigBasedEJBClientContextSelector.isConnectEagerly;
+
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Properties;
@@ -86,6 +88,72 @@ public class PropertiesBasedEJBClientConfigurationTestCase {
         Assert.assertEquals("Unexpected invocation timeout value", 30000, ejbClientConfiguration.getInvocationTimeout());
         // test deployment node selector
         Assert.assertTrue("Unexpected deployment node selector type", ejbClientConfiguration.getDeploymentNodeSelector() instanceof DummyDeploymentNodeSelector);
+
+    }
+
+
+    /**
+     * Tests that the <code>remote.connection.&lt;connection-name&gt;.connect.eager</code> property can be used to control the connection creation behaviour.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testLazyConnectionConfiguration() throws Exception {
+        final InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("lazy-connection-jboss-ejb-client.properties");
+        final Properties clientProperties = new Properties();
+        clientProperties.load(inputStream);
+
+        final EJBClientConfiguration ejbClientConfiguration = new PropertiesBasedEJBClientConfiguration(clientProperties);
+
+        // connection configurations
+        final Iterator<EJBClientConfiguration.RemotingConnectionConfiguration> connectionConfigs = ejbClientConfiguration.getConnectionConfigurations();
+        Assert.assertNotNull("No connection configurations found", connectionConfigs);
+
+        while (connectionConfigs.hasNext()) {
+            final EJBClientConfiguration.RemotingConnectionConfiguration connectionConfig = connectionConfigs.next();
+            final String hostName = connectionConfig.getHost();
+            Assert.assertNotNull("Host name was null in connection configuration", hostName);
+            if ("lazy".equals(hostName)) {
+                Assert.assertFalse("Connection configuration was expected to be marked as lazy", isConnectEagerly(connectionConfig));
+            } else if ("eager".equals(hostName)) {
+                Assert.assertTrue("Connection configuration was expected to be marked as eager", isConnectEagerly(connectionConfig));
+            } else if ("default".equals(hostName)) {
+                Assert.assertTrue("Connection configuration was expected to be marked as eager (by default)", isConnectEagerly(connectionConfig));
+            }
+        }
+
+    }
+
+    /**
+     * Tests that the properties configuration can be used to specify <code>remote.connections.connect.eager=false</code> as a default to be applied for all listed
+     * connection configurations (unless it's overridden for a specific connection configuration)
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testDefaultLazyConnectionConfiguration() throws Exception {
+        final InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("default-lazy-connections-jboss-ejb-client.properties");
+        final Properties clientProperties = new Properties();
+        clientProperties.load(inputStream);
+
+        final EJBClientConfiguration ejbClientConfiguration = new PropertiesBasedEJBClientConfiguration(clientProperties);
+
+        // connection configurations
+        final Iterator<EJBClientConfiguration.RemotingConnectionConfiguration> connectionConfigs = ejbClientConfiguration.getConnectionConfigurations();
+        Assert.assertNotNull("No connection configurations found", connectionConfigs);
+
+        while (connectionConfigs.hasNext()) {
+            final EJBClientConfiguration.RemotingConnectionConfiguration connectionConfig = connectionConfigs.next();
+            final String hostName = connectionConfig.getHost();
+            Assert.assertNotNull("Host name was null in connection configuration", hostName);
+            if ("lazy".equals(hostName)) {
+                Assert.assertFalse("Connection configuration was expected to be marked as lazy", isConnectEagerly(connectionConfig));
+            } else if ("eager".equals(hostName)) {
+                Assert.assertTrue("Connection configuration was expected to be marked as eager", isConnectEagerly(connectionConfig));
+            } else if ("default".equals(hostName)) {
+                Assert.assertFalse("Connection configuration was expected to be marked as lazy (by default)", isConnectEagerly(connectionConfig));
+            }
+        }
 
     }
 
